@@ -67,6 +67,10 @@ extension CameraController {
             if disableAudio == false {
                 self.audioDevice = AVCaptureDevice.default(for: AVMediaType.audio)
             }
+
+            captureSession.beginConfiguration()
+            captureSession.sessionPreset = AVCaptureSession.Preset.photo
+            captureSession.commitConfiguration()
         }
 
         func configureDeviceInputs() throws {
@@ -89,6 +93,10 @@ extension CameraController {
                     self.currentCameraPosition = .front
                 }
             } else { throw CameraControllerError.noCamerasAvailable }
+
+            captureSession.beginConfiguration()
+            captureSession.sessionPreset = AVCaptureSession.Preset.photo
+            captureSession.commitConfiguration()
 
             // Add audio input
             if disableAudio == false {
@@ -254,7 +262,8 @@ extension CameraController {
         case .rear:
             try switchToFrontCamera()
         }
-
+        
+        captureSession.sessionPreset = AVCaptureSession.Preset.photo
         captureSession.commitConfiguration()
     }
 
