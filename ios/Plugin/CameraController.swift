@@ -260,10 +260,21 @@ extension CameraController {
 
     func captureImage(completion: @escaping (UIImage?, Error?) -> Void) {
         guard let captureSession = captureSession, captureSession.isRunning else { completion(nil, CameraControllerError.captureSessionIsMissing); return }
-        let settings = AVCapturePhotoSettings()
+        captureSession.beginConfiguration()
+        captureSession.sessionPreset = AVCaptureSession.Preset.photo
+        captureSession.commitConfiguration()
+        var settings: AVCapturePhotoSettings = AVCapturePhotoSettings()
 
         settings.flashMode = self.flashMode
-        settings.isHighResolutionPhotoEnabled = self.highResolutionOutput
+        if #available(iOS 16.0, *) {
+            let supportedMaxPhotoDimensions = self.rearCameraInput!.device.activeFormat.supportedMaxPhotoDimensions
+            let largestDimesnion = supportedMaxPhotoDimensions.last
+            self.photoOutput!.maxPhotoDimensions = largestDimesnion!
+        }
+
+        self.photoOutput!.maxPhotoQualityPrioritization = .quality
+        settings.maxPhotoDimensions = self.photoOutput!.maxPhotoDimensions
+        settings.isHighResolutionPhotoEnabled = true
 
         self.photoOutput?.capturePhoto(with: settings, delegate: self)
         self.photoCaptureCompletionBlock = completion
