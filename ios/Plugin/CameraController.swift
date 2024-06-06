@@ -263,17 +263,17 @@ extension CameraController {
         captureSession.beginConfiguration()
         captureSession.sessionPreset = AVCaptureSession.Preset.photo
         captureSession.commitConfiguration()
-        var settings: AVCapturePhotoSettings = AVCapturePhotoSettings()
+        let settings: AVCapturePhotoSettings = AVCapturePhotoSettings()
 
         settings.flashMode = self.flashMode
         if #available(iOS 16.0, *) {
             let supportedMaxPhotoDimensions = self.rearCameraInput!.device.activeFormat.supportedMaxPhotoDimensions
             let largestDimesnion = supportedMaxPhotoDimensions.last
             self.photoOutput!.maxPhotoDimensions = largestDimesnion!
+            settings.maxPhotoDimensions = self.photoOutput!.maxPhotoDimensions
         }
 
         self.photoOutput!.maxPhotoQualityPrioritization = .quality
-        settings.maxPhotoDimensions = self.photoOutput!.maxPhotoDimensions
         settings.isHighResolutionPhotoEnabled = true
 
         self.photoOutput?.capturePhoto(with: settings, delegate: self)
