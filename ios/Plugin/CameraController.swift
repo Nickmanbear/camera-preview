@@ -99,17 +99,37 @@ extension CameraController {
 
             self.photoOutput = AVCapturePhotoOutput()
             self.photoOutput!.setPreparedPhotoSettingsArray([AVCapturePhotoSettings(format: [AVVideoCodecKey: AVVideoCodecType.hevc])], completionHandler: nil)
-            self.photoOutput?.isHighResolutionCaptureEnabled = true;
-            if captureSession.canAddOutput(self.photoOutput!) { captureSession.addOutput(self.photoOutput!) }
+            self.photoOutput?.isHighResolutionCaptureEnabled = true
+
+            if captureSession.canAddOutput(self.photoOutput!) {
+                captureSession.addOutput(self.photoOutput!)
+            }
 
             if #available(iOS 16, *) {
-                print("----- configured at 8064 x 6048 -----")
-                self.photoOutput!.isAppleProRAWEnabled = true
-                self.photoOutput!.maxPhotoDimensions = .init(width: 8064, height: 6048)
+                // Get the video input device (camera)
+                if let videoInput = captureSession.inputs.first(where: { $0 is AVCaptureDeviceInput }) as? AVCaptureDeviceInput {
+                    let activeFormat = videoInput.device.activeFormat
+                    let supportedMaxPhotoDimensions = activeFormat.supportedMaxPhotoDimensions
+
+                    // Check if the desired dimensions (8064 x 6048) are supported
+                    let desiredDimensions = CMVideoDimensions(width: 8064, height: 6048)
+                    if supportedMaxPhotoDimensions.contains(where: { $0.width == desiredDimensions.width && $0.height == desiredDimensions.height }) {
+                        print("----- configured at 8064 x 6048 -----")
+                        self.photoOutput!.isAppleProRAWEnabled = true
+                        self.photoOutput!.maxPhotoDimensions = desiredDimensions
+                    } else {
+                        print("Desired dimensions are not supported. Supported dimensions: \(supportedMaxPhotoDimensions)")
+                        // Set maxPhotoDimensions to one of the supported dimensions
+                        if let firstSupportedDimensions = supportedMaxPhotoDimensions.first {
+                            self.photoOutput!.maxPhotoDimensions = firstSupportedDimensions
+                        }
+                    }
+                }
             }
 
             captureSession.startRunning()
         }
+
 
         func configureDataOutput() throws {
             guard let captureSession = self.captureSession else { throw CameraControllerError.captureSessionIsMissing }
@@ -259,24 +279,27 @@ extension CameraController {
     func captureImage(completion: @escaping (UIImage?, Error?) -> Void) {
         guard let captureSession: AVCaptureSession = captureSession, captureSession.isRunning else { completion(nil, CameraControllerError.captureSessionIsMissing); return }
 
+
+        if let videoInput = captureSession.inputs.first(where: { $0 is AVCaptureDeviceInput }) as? AVCaptureDeviceInput {
+            let activeFormat = videoInput.device.activeFormat
+
+
         let settings: AVCapturePhotoSettings
 
         if #available(iOS 16, *) {
-        print("----- trying to capture at 8064 x 6048 -----")
-//            let query = self.photoOutput!.isAppleProRAWEnabled ?
-//                { AVCapturePhotoOutput.isAppleProRAWPixelFormat($0) } :
-//                { AVCapturePhotoOutput.isBayerRAWPixelFormat($0) }
-//
-//
-//            // Retrieve the RAW format, favoring Apple ProRAW when it's in an enabled state.
-//            guard let rawFormat =
-//                    self.photoOutput!.availableRawPhotoPixelFormatTypes.first(where: query) else {
-//                fatalError("No RAW format found.")
-//            }
-//
-//            settings = AVCapturePhotoSettings(rawPixelFormatType: rawFormat)
+            print("----- trying to capture at 8064 x 6048 -----")
+
             settings = AVCapturePhotoSettings()
+            let supportedMaxPhotoDimensions = activeFormat.supportedMaxPhotoDimensions
+
+            // Check if the desired dimensions (8064 x 6048) are supported
+            let desiredDimensions = CMVideoDimensions(width: 8064, height: 6048)
+            if supportedMaxPhotoDimensions.contains(where: { $0.width == desiredDimensions.width && $0.height == desiredDimensions.height }) {
+                print("----- configured at 8064 x 6048 -----")
+
                 settings.maxPhotoDimensions = .init(width: 8064, height: 6048)
+            }
+
 
         } else {
             settings = AVCapturePhotoSettings()
@@ -290,6 +313,7 @@ extension CameraController {
         self.photoOutput?.capturePhoto(with: settings, delegate: self)
 
         self.photoCaptureCompletionBlock = completion
+        }
 
     }
 
