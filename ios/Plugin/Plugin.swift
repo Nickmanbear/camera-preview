@@ -20,7 +20,7 @@ public class CameraPreview: CAPPlugin {
     var toBack: Bool?
     var storeToFile: Bool?
     var enableZoom: Bool?
-    var highResolutionOutput: Bool = false
+    var highResolutionOutput: Bool = true
     var disableAudio: Bool = false
 
     @objc func rotated() {
@@ -43,8 +43,8 @@ public class CameraPreview: CAPPlugin {
 
     @objc func start(_ call: CAPPluginCall) {
         self.cameraPosition = call.getString("position") ?? "rear"
-        self.highResolutionOutput = call.getBool("enableHighResolution") ?? false
-        self.cameraController.highResolutionOutput = self.highResolutionOutput
+        self.highResolutionOutput = true
+        self.cameraController.highResolutionOutput = true
 
         if call.getInt("width") != nil {
             self.width = CGFloat(call.getInt("width")!)
@@ -147,6 +147,7 @@ public class CameraPreview: CAPPlugin {
         DispatchQueue.main.async {
 
             let quality: Int? = call.getInt("quality", 85)
+
 
             self.cameraController.captureImage { (image, error) in
 

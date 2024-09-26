@@ -30,7 +30,7 @@ class CameraController: NSObject {
 
     var sampleBufferCaptureCompletionBlock: ((UIImage?, Error?) -> Void)?
 
-    var highResolutionOutput: Bool = false
+    var highResolutionOutput: Bool = true
 
     var audioDevice: AVCaptureDevice?
     var audioInput: AVCaptureDeviceInput?
@@ -42,35 +42,22 @@ extension CameraController {
     func prepare(cameraPosition: String, disableAudio: Bool, completionHandler: @escaping (Error?) -> Void) {
         func createCaptureSession() {
             self.captureSession = AVCaptureSession()
+            captureSession?.sessionPreset = .photo // Set this to `.photo` to capture highest possible quality
+
         }
 
         func configureCaptureDevices() throws {
 
-            let session = AVCaptureDevice.DiscoverySession(deviceTypes: [.builtInWideAngleCamera], mediaType: AVMediaType.video, position: .unspecified)
+            let device = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back)
 
-            let cameras = session.devices.compactMap { $0 }
-            guard !cameras.isEmpty else { throw CameraControllerError.noCamerasAvailable }
-
-            for camera in cameras {
-                if camera.position == .front {
-                    self.frontCamera = camera
-                }
-
-                if camera.position == .back {
-                    self.rearCamera = camera
-
-                    try camera.lockForConfiguration()
-                    camera.focusMode = .continuousAutoFocus
-                    camera.unlockForConfiguration()
-                }
-            }
-            if disableAudio == false {
-                self.audioDevice = AVCaptureDevice.default(for: AVMediaType.audio)
-            }
-
-            captureSession.beginConfiguration()
-            captureSession.sessionPreset = AVCaptureSession.Preset.photo
-            captureSession.commitConfiguration()
+            do {
+               let input = try AVCaptureDeviceInput(device: device!)
+                   if captureSession?.canAddInput(input) == true {
+                       captureSession?.addInput(input)
+                   }
+               } catch {
+                   print("Error setting up camera input: \(error)")
+               }
         }
 
         func configureDeviceInputs() throws {
@@ -94,10 +81,6 @@ extension CameraController {
                 }
             } else { throw CameraControllerError.noCamerasAvailable }
 
-            captureSession.beginConfiguration()
-            captureSession.sessionPreset = AVCaptureSession.Preset.photo
-            captureSession.commitConfiguration()
-
             // Add audio input
             if disableAudio == false {
                 if let audioDevice = self.audioDevice {
@@ -115,9 +98,16 @@ extension CameraController {
             guard let captureSession = self.captureSession else { throw CameraControllerError.captureSessionIsMissing }
 
             self.photoOutput = AVCapturePhotoOutput()
-            self.photoOutput!.setPreparedPhotoSettingsArray([AVCapturePhotoSettings(format: [AVVideoCodecKey: AVVideoCodecType.jpeg])], completionHandler: nil)
-            self.photoOutput?.isHighResolutionCaptureEnabled = self.highResolutionOutput
+            self.photoOutput!.setPreparedPhotoSettingsArray([AVCapturePhotoSettings(format: [AVVideoCodecKey: AVVideoCodecType.hevc])], completionHandler: nil)
+            self.photoOutput?.isHighResolutionCaptureEnabled = true;
             if captureSession.canAddOutput(self.photoOutput!) { captureSession.addOutput(self.photoOutput!) }
+
+            if #available(iOS 16, *) {
+                print("----- configured at 8064 x 6048 -----")
+                self.photoOutput!.isAppleProRAWEnabled = true
+                self.photoOutput!.maxPhotoDimensions = .init(width: 8064, height: 6048)
+            }
+
             captureSession.startRunning()
         }
 
@@ -262,31 +252,45 @@ extension CameraController {
         case .rear:
             try switchToFrontCamera()
         }
-        
-        captureSession.sessionPreset = AVCaptureSession.Preset.photo
+
         captureSession.commitConfiguration()
     }
 
     func captureImage(completion: @escaping (UIImage?, Error?) -> Void) {
-        guard let captureSession = captureSession, captureSession.isRunning else { completion(nil, CameraControllerError.captureSessionIsMissing); return }
-        captureSession.beginConfiguration()
-        captureSession.sessionPreset = AVCaptureSession.Preset.photo
-        captureSession.commitConfiguration()
-        let settings: AVCapturePhotoSettings = AVCapturePhotoSettings()
+        guard let captureSession: AVCaptureSession = captureSession, captureSession.isRunning else { completion(nil, CameraControllerError.captureSessionIsMissing); return }
 
-        settings.flashMode = self.flashMode
-        if #available(iOS 16.0, *) {
-            let supportedMaxPhotoDimensions = self.rearCameraInput!.device.activeFormat.supportedMaxPhotoDimensions
-            let largestDimesnion = supportedMaxPhotoDimensions.last
-            self.photoOutput!.maxPhotoDimensions = largestDimesnion!
-            settings.maxPhotoDimensions = self.photoOutput!.maxPhotoDimensions
+        let settings: AVCapturePhotoSettings
+
+        if #available(iOS 16, *) {
+        print("----- trying to capture at 8064 x 6048 -----")
+//            let query = self.photoOutput!.isAppleProRAWEnabled ?
+//                { AVCapturePhotoOutput.isAppleProRAWPixelFormat($0) } :
+//                { AVCapturePhotoOutput.isBayerRAWPixelFormat($0) }
+//
+//
+//            // Retrieve the RAW format, favoring Apple ProRAW when it's in an enabled state.
+//            guard let rawFormat =
+//                    self.photoOutput!.availableRawPhotoPixelFormatTypes.first(where: query) else {
+//                fatalError("No RAW format found.")
+//            }
+//
+//            settings = AVCapturePhotoSettings(rawPixelFormatType: rawFormat)
+            settings = AVCapturePhotoSettings()
+                settings.maxPhotoDimensions = .init(width: 8064, height: 6048)
+
+        } else {
+            settings = AVCapturePhotoSettings()
+
+            settings.flashMode = self.flashMode
+            settings.isHighResolutionPhotoEnabled = true
         }
 
-        self.photoOutput!.maxPhotoQualityPrioritization = .quality
-        settings.isHighResolutionPhotoEnabled = true
+
 
         self.photoOutput?.capturePhoto(with: settings, delegate: self)
+
         self.photoCaptureCompletionBlock = completion
+
     }
 
     func captureSample(completion: @escaping (UIImage?, Error?) -> Void) {
@@ -514,7 +518,6 @@ extension CameraController: AVCapturePhotoCaptureDelegate {
         }
     }
 }
-
 extension CameraController: AVCaptureVideoDataOutputSampleBufferDelegate {
     func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
         guard let completion = sampleBufferCaptureCompletionBlock else { return }
