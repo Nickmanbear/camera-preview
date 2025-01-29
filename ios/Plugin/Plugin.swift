@@ -1,6 +1,7 @@
 import Foundation
 import Capacitor
 import AVFoundation
+import SDWebImageWebPCoder
 import SDWebImage
 
 /**
@@ -24,6 +25,14 @@ public class CameraPreview: CAPPlugin {
     var enableZoom: Bool?
     var highResolutionOutput: Bool = true
     var disableAudio: Bool = false
+
+    public override func load() {
+        super.load()
+        
+        // Register WebP encoding support
+        let webPCoder = SDImageWebPCoder.shared
+        SDImageCodersManager.shared.addCoder(webPCoder)
+    }
 
     @objc func rotated() {
         let height = self.paddingBottom != nil ? self.height! - self.paddingBottom!: self.height!
