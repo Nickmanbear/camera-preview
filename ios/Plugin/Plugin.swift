@@ -1,6 +1,8 @@
 import Foundation
 import Capacitor
 import AVFoundation
+import SDWebImage
+
 /**
  * Please read the Capacitor iOS Plugin Development Guide
  * here: https://capacitor.ionicframework.com/docs/plugins/ios
@@ -163,9 +165,9 @@ public class CameraPreview: CAPPlugin {
                 let imageData: Data?
                 if self.cameraController.currentCameraPosition == .front {
                     let flippedImage = image.withHorizontallyFlippedOrientation()
-                    imageData = flippedImage.jpegData(compressionQuality: CGFloat(quality!/100))
+                    imageData = flippedImage.sd_imageData(as: .webP, compressionQuality: CGFloat(quality!/100))
                 } else {
-                    imageData = image.jpegData(compressionQuality: CGFloat(quality!/100))
+                    imageData = image.sd_imageData(as: .webP, compressionQuality: CGFloat(quality!/100))
                 }
 
                 if self.storeToFile == false {
